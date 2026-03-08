@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeLinkedInPublicPage } from '../../../lib/linkedin';
-import { generateAnalysis } from '../../../lib/openai';
+import { scrapeLinkedInPublicPage } from '@/lib/linkedin';
+import { generateAnalysis } from '@/lib/openai';
+import { getRecentAnalysisCount, recordAnalysisAttempt } from '@/lib/db';
 
 function isValidLinkedInUrl(input: string) {
   try {
@@ -9,6 +10,20 @@ function isValidLinkedInUrl(input: string) {
   } catch {
     return false;
   }
+}
+
+function getRequestIp(request: NextRequest) {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0]?.trim() || 'unknown';
+  }
+
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp.trim();
+  }
+
+  return 'unknown';
 }
 
 export async function POST(request: NextRequest) {
@@ -23,6 +38,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ipAddress = getRequestIp(request);
+    const maxPerHour = Number(process.env.ANALYZE_LIMIT_PER_HOUR || '10');
+
+    if (ipAddress !== 'unknown') {
+      const recentCount = await getRecentAnalysisCount(ipAddress);
+
+      if (recentCount >= maxPerHour) {
+        return NextResponse.json(
+          {
+            error:
+              'This IP has already burned through its hourly kitten budget. Try again in a bit.',
+          },
+          { status: 429 },
+        );
+      }
+
+      await recordAnalysisAttempt(ipAddress);
+    }
+
     const summary = await scrapeLinkedInPublicPage(url);
     const analysis = await generateAnalysis(summary);
 
@@ -32,7 +66,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'The kittens got distracted by a laser pointer and could not read that page. Try a more public LinkedIn URL or a page with visible posts.',
+          'The kittens got distracted by a laser pointer and could not finish that read. Try again in a minute.',
       },
       { status: 500 },
     );
