@@ -30,6 +30,19 @@ export async function ensureSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS analysis_events (
+        id SERIAL PRIMARY KEY,
+        ip_address TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_analysis_events_ip_created_at
+      ON analysis_events (ip_address, created_at DESC);
+    `);
   } finally {
     client.release();
   }
@@ -43,6 +56,39 @@ export async function saveLead(email: string, linkedinUrl: string) {
       'INSERT INTO leads (email, linkedin_url) VALUES ($1, $2)',
       [email, linkedinUrl],
     );
+  } finally {
+    client.release();
+  }
+}
+
+export async function recordAnalysisAttempt(ipAddress: string) {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query(
+      'INSERT INTO analysis_events (ip_address) VALUES ($1)',
+      [ipAddress],
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function getRecentAnalysisCount(ipAddress: string) {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    const result = await client.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM analysis_events
+      WHERE ip_address = $1
+      AND created_at >= NOW() - INTERVAL '1 hour'
+      `,
+      [ipAddress],
+    );
+
+    return result.rows[0]?.count ?? 0;
   } finally {
     client.release();
   }
@@ -65,7 +111,7 @@ export async function getAnalytics() {
   await ensureSchema();
   const client = await getPool().connect();
   try {
-    const [totalResult, domainsResult, todayResult] = await Promise.all([
+    const [totalResult, domainsResult, todayResult, analysesResult] = await Promise.all([
       client.query('SELECT COUNT(*)::int AS count FROM leads'),
       client.query(`
         SELECT
@@ -81,11 +127,17 @@ export async function getAnalytics() {
         FROM leads
         WHERE created_at >= NOW() - INTERVAL '24 hours'
       `),
+      client.query(`
+        SELECT COUNT(*)::int AS count
+        FROM analysis_events
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
+      `),
     ]);
 
     return {
       totalLeads: totalResult.rows[0]?.count ?? 0,
       last24Hours: todayResult.rows[0]?.count ?? 0,
+      last24HourAnalyses: analysesResult.rows[0]?.count ?? 0,
       topDomains: domainsResult.rows,
     };
   } finally {
