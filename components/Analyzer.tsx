@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type AnalysisResult = {
   summary: {
@@ -17,6 +17,19 @@ type AnalysisResult = {
   };
   pageRecommendations: string[];
   contentRecommendations: string[];
+  roastScore: number;
+  roastLabel: string;
+  roastVerdict: string;
+};
+
+type PublicStats = {
+  totalAnalyses: number;
+  leaderboard: Array<{
+    display_name: string;
+    page_type: string;
+    roast_score: number;
+    created_at: string;
+  }>;
 };
 
 const kittenFacts = [
@@ -34,14 +47,20 @@ const catGifs = [
   'https://media.giphy.com/media/13borq7Zo2kulO/giphy.gif',
 ];
 
+function formatScoreLabel(score: number, label: string) {
+  return `${score}/100 · ${label}`;
+}
+
 export default function Analyzer() {
   const [url, setUrl] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
+  const [copiedCard, setCopiedCard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [stats, setStats] = useState<PublicStats>({ totalAnalyses: 0, leaderboard: [] });
   const [unlockedRecommendations, setUnlockedRecommendations] = useState<string[] | null>(null);
 
   const randomFact = useMemo(
@@ -53,6 +72,25 @@ export default function Analyzer() {
     () => catGifs[Math.floor(Math.random() * catGifs.length)],
     [],
   );
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/stats', { cache: 'no-store' });
+        const data = await response.json();
+        if (response.ok) {
+          setStats({
+            totalAnalyses: data.totalAnalyses ?? 0,
+            leaderboard: Array.isArray(data.leaderboard) ? data.leaderboard : [],
+          });
+        }
+      } catch {
+        // ignore stats load failures
+      }
+    }
+
+    loadStats();
+  }, []);
 
   async function handleAnalyze() {
     const cleanedUrl = url.trim();
@@ -67,6 +105,7 @@ export default function Analyzer() {
     setResult(null);
     setUnlockedRecommendations(null);
     setCopiedShare(false);
+    setCopiedCard(false);
 
     try {
       const response = await fetch('/api/analyze', {
@@ -81,6 +120,19 @@ export default function Analyzer() {
       }
 
       setResult(data);
+
+      try {
+        const statsResponse = await fetch('/api/stats', { cache: 'no-store' });
+        const statsData = await statsResponse.json();
+        if (statsResponse.ok) {
+          setStats({
+            totalAnalyses: statsData.totalAnalyses ?? 0,
+            leaderboard: Array.isArray(statsData.leaderboard) ? statsData.leaderboard : [],
+          });
+        }
+      } catch {
+        // ignore
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -141,9 +193,10 @@ export default function Analyzer() {
 
     const shareText = `Kitten Soup just audited ${subject}.
 
+Score: ${result.roastScore}/100 (${result.roastLabel})
 ${interactionLine}
 
-It was rude. It was useful.
+Verdict: ${result.roastVerdict}
 
 Try it here: ${siteUrl}`;
 
@@ -167,6 +220,42 @@ Try it here: ${siteUrl}`;
     }
   }
 
+  async function handleCopyRoastCard() {
+    if (!result) return;
+
+    const siteUrl =
+      typeof window !== 'undefined' ? window.location.origin : 'https://your-site-url.com';
+
+    const cardText = `🐱 KITTEN SOUP REPORT
+
+${result.summary.displayName}
+${result.summary.pageType === 'company' ? 'Company Page' : 'Personal Profile'}
+
+LinkedIn Score
+${formatScoreLabel(result.roastScore, result.roastLabel)}
+
+Average Engagement
+${
+  result.summary.avgVisiblePostInteractions != null
+    ? `~${result.summary.avgVisiblePostInteractions} visible interactions`
+    : 'Limited public engagement data'
+}
+
+Verdict
+${result.roastVerdict}
+
+Try it:
+${siteUrl}`;
+
+    try {
+      await navigator.clipboard.writeText(cardText);
+      setCopiedCard(true);
+      window.setTimeout(() => setCopiedCard(false), 2200);
+    } catch {
+      setError('The kittens failed to copy your roast card. Try again.');
+    }
+  }
+
   return (
     <div className="page-shell">
       <section className="hero-card" style={{ position: 'relative' }}>
@@ -181,6 +270,9 @@ Try it here: ${siteUrl}`;
           and hand back visibility tips with suspicious confidence.
         </p>
         <p className="hero-sub">{randomFact}</p>
+        <p className="hero-meta">
+          {stats.totalAnalyses.toLocaleString()} LinkedIn profiles judged by cats
+        </p>
 
         <div className="input-row">
           <input
@@ -203,6 +295,7 @@ Try it here: ${siteUrl}`;
             <div className="pill-row">
               <span className="pill">{result.summary.pageType}</span>
               <span className="pill">{result.summary.fetchQuality} public read</span>
+              <span className="pill">{formatScoreLabel(result.roastScore, result.roastLabel)}</span>
               {result.summary.visibleEmployeeCount ? (
                 <span className="pill">{result.summary.visibleEmployeeCount} employees</span>
               ) : null}
@@ -211,14 +304,26 @@ Try it here: ${siteUrl}`;
               ) : null}
             </div>
             <h2>{result.summary.displayName}</h2>
+            <p className="roast-verdict">{result.roastVerdict}</p>
+            <div className="score-bar-wrap" aria-hidden="true">
+              <div
+                className="score-bar-fill"
+                style={{ width: `${Math.max(8, Math.min(result.roastScore, 100))}%` }}
+              />
+            </div>
           </section>
 
           <section className="result-card full-width">
             <div className="share-row">
               <h3>2 page fixes the kittens would make</h3>
-              <button type="button" className="secondary-button" onClick={handleCopyShare}>
-                {copiedShare ? 'copied for LinkedIn 😼' : 'copy my LinkedIn roast'}
-              </button>
+              <div className="button-cluster">
+                <button type="button" className="secondary-button" onClick={handleCopyShare}>
+                  {copiedShare ? 'copied 😼' : 'copy my LinkedIn roast'}
+                </button>
+                <button type="button" className="secondary-button" onClick={handleCopyRoastCard}>
+                  {copiedCard ? 'card copied 🐾' : 'copy roast card'}
+                </button>
+              </div>
             </div>
 
             <ol className="recommendation-list">
@@ -228,8 +333,7 @@ Try it here: ${siteUrl}`;
             </ol>
 
             <p className="share-note">
-              Use the button above to copy a post-friendly blurb and send more unsuspecting humans to
-              Kitten Soup.
+              Copy the roast or the roast card and post it on LinkedIn to summon more humans into the soup.
             </p>
           </section>
 
@@ -273,6 +377,27 @@ Try it here: ${siteUrl}`;
               </>
             )}
           </section>
+
+          {stats.leaderboard.length ? (
+            <section className="result-card full-width leaderboard-card">
+              <h3>Top roast scores today</h3>
+              <div className="leaderboard-list">
+                {stats.leaderboard.map((entry, index) => (
+                  <div
+                    key={`${entry.display_name}-${entry.created_at}-${index}`}
+                    className="leaderboard-row"
+                  >
+                    <span className="leaderboard-rank">#{index + 1}</span>
+                    <div className="leaderboard-main">
+                      <strong>{entry.display_name}</strong>
+                      <span>{entry.page_type}</span>
+                    </div>
+                    <span className="leaderboard-score">{entry.roast_score}/100</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {result.summary.fetchQuality === 'partial' ? (
             <section className="result-card full-width tips-card">
