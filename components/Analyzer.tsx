@@ -119,7 +119,7 @@ export default function Analyzer() {
           <span>🐱</span>
           <span>✨</span>
         </div>
-        <p className="eyebrow">viral linkedin fixer for humans and brands</p>
+        <p className="eyebrow">LINKEDIN FIXER FOR HUMANS, BRANDS, AND FELINES</p>
         <h1>Kitten Soup</h1>
         <p className="hero-copy">
           Paste your LinkedIn page. Tiny internet cats inspect the public bits, roast the weak spots,
@@ -156,36 +156,15 @@ export default function Analyzer() {
               ) : null}
             </div>
             <h2>{result.summary.displayName}</h2>
-            <p className="headline">{result.summary.headlineOrTagline}</p>
-            <p className="about">{result.summary.about}</p>
           </section>
 
-          <section className="result-card">
+          <section className="result-card full-width">
             <h3>2 page fixes the kittens would make</h3>
             <ol className="recommendation-list">
               {result.pageRecommendations.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ol>
-          </section>
-
-          <section className="result-card full-width">
-            <h3>Recent post sniff test</h3>
-            <div className="post-list">
-              {result.summary.recentPosts.length ? (
-                result.summary.recentPosts.slice(0, 8).map((post, index) => (
-                  <article key={`${index}-${post.slice(0, 20)}`} className="post-chip">
-                    <span>post {index + 1}</span>
-                    <p>{post}</p>
-                  </article>
-                ))
-              ) : (
-                <p className="muted">
-                  The cats found very few public posts. You will still get lighter recommendations, but more
-                  visible recent posts will make the analysis sharper.
-                </p>
-              )}
-            </div>
           </section>
 
           <section className="result-card full-width gated-card">
