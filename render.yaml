@@ -19,4 +19,4 @@ services:
 
 databases:
   - name: kitten-soup-db
-    plan: starter
+    plan: free
