@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeLinkedInPublicPage } from '../../../../lib/linkedin';
-import { generateAnalysis } from '../../../../lib/openai';
+import { scrapeLinkedInPublicPage } from '../../../lib/linkedin';
+import { generateAnalysis } from '../../../lib/openai';
 
 function isValidLinkedInUrl(input: string) {
   try {
