@@ -347,21 +347,6 @@ th,
   max-width: 760px;
 }
 
-@media (max-width: 900px) {
-  .share-row,
-  .admin-actions {
-    align-items: stretch;
-  }
-
-  .secondary-button {
-    width: 100%;
-  }
-
-  .cat-gif {
-    position: static;
-    width: 110px;
-    margin: 0 0 16px auto;
-  }
 .hero-meta {
   margin-top: 10px;
   color: #c2b6ff;
@@ -439,6 +424,21 @@ th,
 }
 
 @media (max-width: 900px) {
+  .share-row,
+  .admin-actions {
+    align-items: stretch;
+  }
+
+  .secondary-button {
+    width: 100%;
+  }
+
+  .cat-gif {
+    position: static;
+    width: 110px;
+    margin: 0 0 16px auto;
+  }
+
   .button-cluster {
     width: 100%;
   }
