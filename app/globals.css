@@ -305,3 +305,57 @@ th,
 
   button { width: 100%; }
 }
+.cat-gif {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 120px;
+  z-index: 2;
+}
+
+.cat-gif img {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+
+.share-row,
+.admin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.share-note {
+  margin-top: 14px;
+  color: #c2b6ff;
+}
+
+.admin-auth-card {
+  max-width: 760px;
+}
+
+@media (max-width: 900px) {
+  .share-row,
+  .admin-actions {
+    align-items: stretch;
+  }
+
+  .secondary-button {
+    width: 100%;
+  }
+
+  .cat-gif {
+    position: static;
+    width: 110px;
+    margin: 0 0 16px auto;
+  }
+}
