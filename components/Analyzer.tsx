@@ -41,6 +41,13 @@ export default function Analyzer() {
   );
 
   async function handleAnalyze() {
+    const cleanedUrl = url.trim();
+
+    if (!cleanedUrl) {
+      setError('Paste a LinkedIn URL first, tiny goblin.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -50,7 +57,7 @@ export default function Analyzer() {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: cleanedUrl }),
       });
 
       const data = await response.json();
@@ -68,6 +75,14 @@ export default function Analyzer() {
 
   async function handleUnlock() {
     if (!result) return;
+
+    const cleanedEmail = email.trim();
+
+    if (!cleanedEmail) {
+      setError('Drop in an email so the kittens can open the box.');
+      return;
+    }
+
     setUnlocking(true);
     setError(null);
 
@@ -76,7 +91,7 @@ export default function Analyzer() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: cleanedEmail,
           linkedinUrl: result.summary.url,
           recommendations: result.contentRecommendations,
         }),
@@ -119,7 +134,7 @@ export default function Analyzer() {
             value={url}
             onChange={(event) => setUrl(event.target.value)}
           />
-          <button onClick={handleAnalyze} disabled={loading || !url.trim()}>
+          <button onClick={handleAnalyze} disabled={loading}>
             {loading ? 'cats are investigating…' : 'analyze my linkedin'}
           </button>
         </div>
@@ -199,7 +214,7 @@ export default function Analyzer() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                   />
-                  <button onClick={handleUnlock} disabled={unlocking || !email.trim()}>
+                  <button onClick={handleUnlock} disabled={unlocking}>
                     {unlocking ? 'unlocking…' : 'unlock the kitten stash'}
                   </button>
                 </div>
