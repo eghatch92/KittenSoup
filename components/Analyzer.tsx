@@ -20,10 +20,18 @@ type AnalysisResult = {
 };
 
 const kittenFacts = [
-  'Tiny paws. Ruthless opinions.',
-  'This analyzer has never respected a dress code.',
-  'Your LinkedIn is being judged by a cat in sunglasses.',
-  'Professional polish. Goblin delivery.',
+  'Your LinkedIn is currently being judged by a cat wearing sunglasses.',
+  'A tiny cat CEO just audited your LinkedIn strategy.',
+  'Three kittens and one intern are reviewing your posts.',
+  'A cat in a tiny suit is evaluating your personal brand.',
+  'The kittens have entered the boardroom.',
+];
+
+const catGifs = [
+  'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif',
+  'https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif',
+  'https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif',
+  'https://media.giphy.com/media/13borq7Zo2kulO/giphy.gif',
 ];
 
 export default function Analyzer() {
@@ -37,6 +45,11 @@ export default function Analyzer() {
 
   const randomFact = useMemo(
     () => kittenFacts[Math.floor(Math.random() * kittenFacts.length)],
+    [],
+  );
+
+  const randomCatGif = useMemo(
+    () => catGifs[Math.floor(Math.random() * catGifs.length)],
     [],
   );
 
@@ -112,13 +125,29 @@ export default function Analyzer() {
 
   return (
     <div className="page-shell">
-      <section className="hero-card">
-        <div className="floating-kittens" aria-hidden="true">
-          <span>🐈</span>
-          <span>🐾</span>
-          <span>🐱</span>
-          <span>✨</span>
+      <section className="hero-card" style={{ position: 'relative' }}>
+        <div
+          className="cat-gif"
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            width: 120,
+            zIndex: 2,
+          }}
+        >
+          <img
+            src={randomCatGif}
+            alt="chaotic business cat"
+            style={{
+              width: '100%',
+              borderRadius: 12,
+              display: 'block',
+            }}
+          />
         </div>
+
         <p className="eyebrow">LINKEDIN FIXER FOR HUMANS, BRANDS, AND FELINES</p>
         <h1>Kitten Soup</h1>
         <p className="hero-copy">
