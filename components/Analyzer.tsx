@@ -47,6 +47,13 @@ const catGifs = [
   'https://media.giphy.com/media/13borq7Zo2kulO/giphy.gif',
 ];
 
+const loadingSteps = [
+  '🐾 sniffing the profile',
+  '🐾 reading the public bits',
+  '🐾 judging the engagement',
+  '🐾 writing the roast',
+];
+
 function formatScoreLabel(score: number, label: string) {
   return `${score}/100 · ${label}`;
 }
@@ -56,12 +63,12 @@ export default function Analyzer() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
-  const [copiedShare, setCopiedShare] = useState(false);
   const [copiedCard, setCopiedCard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [stats, setStats] = useState<PublicStats>({ totalAnalyses: 0, leaderboard: [] });
   const [unlockedRecommendations, setUnlockedRecommendations] = useState<string[] | null>(null);
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0);
 
   const randomFact = useMemo(
     () => kittenFacts[Math.floor(Math.random() * kittenFacts.length)],
@@ -92,6 +99,19 @@ export default function Analyzer() {
     loadStats();
   }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStepIndex(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setLoadingStepIndex((current) => (current + 1) % loadingSteps.length);
+    }, 1100);
+
+    return () => window.clearInterval(interval);
+  }, [loading]);
+
   async function handleAnalyze() {
     const cleanedUrl = url.trim();
 
@@ -101,10 +121,10 @@ export default function Analyzer() {
     }
 
     setLoading(true);
+    setLoadingStepIndex(0);
     setError(null);
     setResult(null);
     setUnlockedRecommendations(null);
-    setCopiedShare(false);
     setCopiedCard(false);
 
     try {
@@ -177,49 +197,6 @@ export default function Analyzer() {
     }
   }
 
-  async function handleCopyShare() {
-    if (!result) return;
-
-    const siteUrl =
-      typeof window !== 'undefined' ? window.location.origin : 'https://your-site-url.com';
-
-    const subject =
-      result.summary.pageType === 'company' ? 'our LinkedIn company page' : 'my LinkedIn profile';
-
-    const interactionLine =
-      result.summary.avgVisiblePostInteractions != null
-        ? `Apparently ${subject} averages about ${result.summary.avgVisiblePostInteractions} visible interactions per post.`
-        : `Apparently the kittens found a few visibility problems on ${subject}.`;
-
-    const shareText = `Kitten Soup just audited ${subject}.
-
-Score: ${result.roastScore}/100 (${result.roastLabel})
-${interactionLine}
-
-Verdict: ${result.roastVerdict}
-
-Try it here: ${siteUrl}`;
-
-    try {
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({
-          title: 'Kitten Soup',
-          text: shareText,
-          url: siteUrl,
-        });
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(shareText);
-      } else {
-        throw new Error('Clipboard is not available');
-      }
-
-      setCopiedShare(true);
-      window.setTimeout(() => setCopiedShare(false), 2200);
-    } catch {
-      setError('The kittens failed to copy your share text. Try again.');
-    }
-  }
-
   async function handleCopyRoastCard() {
     if (!result) return;
 
@@ -285,6 +262,17 @@ ${siteUrl}`;
             {loading ? 'cats are investigating…' : 'analyze my linkedin'}
           </button>
         </div>
+
+        {loading ? (
+          <div className="loading-card" aria-live="polite">
+            <div className="loading-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+            <p>{loadingSteps[loadingStepIndex]}</p>
+          </div>
+        ) : null}
       </section>
 
       {error ? <div className="error-card">{error}</div> : null}
@@ -305,23 +293,14 @@ ${siteUrl}`;
             </div>
             <h2>{result.summary.displayName}</h2>
             <p className="roast-verdict">{result.roastVerdict}</p>
-            <div className="score-bar-wrap" aria-hidden="true">
-              <div
-                className="score-bar-fill"
-                style={{ width: `${Math.max(8, Math.min(result.roastScore, 100))}%` }}
-              />
-            </div>
           </section>
 
           <section className="result-card full-width">
             <div className="share-row">
               <h3>2 page fixes the kittens would make</h3>
               <div className="button-cluster">
-                <button type="button" className="secondary-button" onClick={handleCopyShare}>
-                  {copiedShare ? 'copied 😼' : 'copy my LinkedIn roast'}
-                </button>
                 <button type="button" className="secondary-button" onClick={handleCopyRoastCard}>
-                  {copiedCard ? 'card copied 🐾' : 'copy roast card'}
+                  {copiedCard ? 'copied 😼 now post it on LinkedIn' : 'copy my roast card and post to LinkedIn'}
                 </button>
               </div>
             </div>
@@ -333,7 +312,7 @@ ${siteUrl}`;
             </ol>
 
             <p className="share-note">
-              Copy the roast or the roast card and post it on LinkedIn to summon more humans into the soup.
+              Copy the roast card, paste it into LinkedIn, and send more humans into the soup.
             </p>
           </section>
 
