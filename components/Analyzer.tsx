@@ -39,6 +39,7 @@ export default function Analyzer() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [unlockedRecommendations, setUnlockedRecommendations] = useState<string[] | null>(null);
@@ -65,6 +66,7 @@ export default function Analyzer() {
     setError(null);
     setResult(null);
     setUnlockedRecommendations(null);
+    setCopiedShare(false);
 
     try {
       const response = await fetch('/api/analyze', {
@@ -123,29 +125,53 @@ export default function Analyzer() {
     }
   }
 
+  async function handleCopyShare() {
+    if (!result) return;
+
+    const siteUrl =
+      typeof window !== 'undefined' ? window.location.origin : 'https://your-site-url.com';
+
+    const subject =
+      result.summary.pageType === 'company' ? 'our LinkedIn company page' : 'my LinkedIn profile';
+
+    const interactionLine =
+      result.summary.avgVisiblePostInteractions != null
+        ? `Apparently ${subject} averages about ${result.summary.avgVisiblePostInteractions} visible interactions per post.`
+        : `Apparently the kittens found a few visibility problems on ${subject}.`;
+
+    const shareText = `Kitten Soup just audited ${subject}.
+
+${interactionLine}
+
+It was rude. It was useful.
+
+Try it here: ${siteUrl}`;
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({
+          title: 'Kitten Soup',
+          text: shareText,
+          url: siteUrl,
+        });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+      } else {
+        throw new Error('Clipboard is not available');
+      }
+
+      setCopiedShare(true);
+      window.setTimeout(() => setCopiedShare(false), 2200);
+    } catch {
+      setError('The kittens failed to copy your share text. Try again.');
+    }
+  }
+
   return (
     <div className="page-shell">
       <section className="hero-card" style={{ position: 'relative' }}>
-        <div
-          className="cat-gif"
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            top: 20,
-            right: 20,
-            width: 120,
-            zIndex: 2,
-          }}
-        >
-          <img
-            src={randomCatGif}
-            alt="chaotic business cat"
-            style={{
-              width: '100%',
-              borderRadius: 12,
-              display: 'block',
-            }}
-          />
+        <div className="cat-gif" aria-hidden="true">
+          <img src={randomCatGif} alt="chaotic business cat" />
         </div>
 
         <p className="eyebrow">LINKEDIN FIXER FOR HUMANS, BRANDS, AND FELINES</p>
@@ -188,12 +214,23 @@ export default function Analyzer() {
           </section>
 
           <section className="result-card full-width">
-            <h3>2 page fixes the kittens would make</h3>
+            <div className="share-row">
+              <h3>2 page fixes the kittens would make</h3>
+              <button type="button" className="secondary-button" onClick={handleCopyShare}>
+                {copiedShare ? 'copied for LinkedIn 😼' : 'copy my LinkedIn roast'}
+              </button>
+            </div>
+
             <ol className="recommendation-list">
               {result.pageRecommendations.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ol>
+
+            <p className="share-note">
+              Use the button above to copy a post-friendly blurb and send more unsuspecting humans to
+              Kitten Soup.
+            </p>
           </section>
 
           <section className="result-card full-width gated-card">
@@ -201,8 +238,8 @@ export default function Analyzer() {
               <div>
                 <h3>3 content recommendations hiding in the cardboard box</h3>
                 <p>
-                  Enter your email to unlock the content advice. The tiny cats may occasionally send Little Post
-                  Manager updates and mildly useful internet business things.
+                  Enter your email to unlock the content advice. The tiny cats may occasionally send
+                  Little Post Manager updates and mildly useful internet business things.
                 </p>
               </div>
             </div>
