@@ -35,6 +35,10 @@ export async function ensureSchema() {
       CREATE TABLE IF NOT EXISTS analysis_events (
         id SERIAL PRIMARY KEY,
         ip_address TEXT NOT NULL,
+        linkedin_url TEXT,
+        display_name TEXT,
+        page_type TEXT,
+        roast_score INT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
@@ -42,6 +46,26 @@ export async function ensureSchema() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_analysis_events_ip_created_at
       ON analysis_events (ip_address, created_at DESC);
+    `);
+
+    await client.query(`
+      ALTER TABLE analysis_events
+      ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
+    `);
+
+    await client.query(`
+      ALTER TABLE analysis_events
+      ADD COLUMN IF NOT EXISTS display_name TEXT;
+    `);
+
+    await client.query(`
+      ALTER TABLE analysis_events
+      ADD COLUMN IF NOT EXISTS page_type TEXT;
+    `);
+
+    await client.query(`
+      ALTER TABLE analysis_events
+      ADD COLUMN IF NOT EXISTS roast_score INT;
     `);
   } finally {
     client.release();
@@ -55,19 +79,6 @@ export async function saveLead(email: string, linkedinUrl: string) {
     await client.query(
       'INSERT INTO leads (email, linkedin_url) VALUES ($1, $2)',
       [email, linkedinUrl],
-    );
-  } finally {
-    client.release();
-  }
-}
-
-export async function recordAnalysisAttempt(ipAddress: string) {
-  await ensureSchema();
-  const client = await getPool().connect();
-  try {
-    await client.query(
-      'INSERT INTO analysis_events (ip_address) VALUES ($1)',
-      [ipAddress],
     );
   } finally {
     client.release();
@@ -89,6 +100,40 @@ export async function getRecentAnalysisCount(ipAddress: string) {
     );
 
     return result.rows[0]?.count ?? 0;
+  } finally {
+    client.release();
+  }
+}
+
+export async function recordAnalysisAttempt(params: {
+  ipAddress: string;
+  linkedinUrl?: string | null;
+  displayName?: string | null;
+  pageType?: string | null;
+  roastScore?: number | null;
+}) {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query(
+      `
+      INSERT INTO analysis_events (
+        ip_address,
+        linkedin_url,
+        display_name,
+        page_type,
+        roast_score
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        params.ipAddress,
+        params.linkedinUrl ?? null,
+        params.displayName ?? null,
+        params.pageType ?? null,
+        params.roastScore ?? null,
+      ],
+    );
   } finally {
     client.release();
   }
@@ -139,6 +184,38 @@ export async function getAnalytics() {
       last24Hours: todayResult.rows[0]?.count ?? 0,
       last24HourAnalyses: analysesResult.rows[0]?.count ?? 0,
       topDomains: domainsResult.rows,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+export async function getPublicStats() {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    const [totalAnalysesResult, leaderboardResult] = await Promise.all([
+      client.query(`
+        SELECT COUNT(*)::int AS count
+        FROM analysis_events
+      `),
+      client.query(`
+        SELECT
+          COALESCE(NULLIF(display_name, ''), 'Mystery LinkedIn Creature') AS display_name,
+          COALESCE(NULLIF(page_type, ''), 'unknown') AS page_type,
+          roast_score,
+          created_at
+        FROM analysis_events
+        WHERE roast_score IS NOT NULL
+          AND created_at >= NOW() - INTERVAL '24 hours'
+        ORDER BY roast_score DESC, created_at DESC
+        LIMIT 10
+      `),
+    ]);
+
+    return {
+      totalAnalyses: totalAnalysesResult.rows[0]?.count ?? 0,
+      leaderboard: leaderboardResult.rows,
     };
   } finally {
     client.release();
