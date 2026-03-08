@@ -1,4 +1,4 @@
-import { getAnalytics, getLeadRows } from '@/lib/db';
+import { getAnalytics, getLeadRows } from '../../lib/db';
 
 export const dynamic = 'force-dynamic';
 
