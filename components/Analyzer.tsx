@@ -20,6 +20,8 @@ type AnalysisResult = {
   roastScore: number;
   roastLabel: string;
   roastVerdict: string;
+  confidence: 'high' | 'medium' | 'low';
+  leaderboardEligible: boolean;
 };
 
 type PublicStats = {
@@ -28,6 +30,7 @@ type PublicStats = {
     display_name: string;
     page_type: string;
     roast_score: number;
+    confidence?: string;
     created_at: string;
   }>;
 };
@@ -84,6 +87,12 @@ function formatScoreLabel(score: number, label: string) {
   return `${score}/100 · ${label}`;
 }
 
+function formatConfidenceLabel(confidence: 'high' | 'medium' | 'low') {
+  if (confidence === 'high') return 'high confidence';
+  if (confidence === 'medium') return 'medium confidence';
+  return 'low confidence';
+}
+
 export default function Analyzer() {
   const [url, setUrl] = useState('');
   const [email, setEmail] = useState('');
@@ -133,7 +142,7 @@ export default function Analyzer() {
 
     const interval = window.setInterval(() => {
       setLoadingStepIndex((current) => (current + 1) % loadingSteps.length);
-    }, 1100);
+    }, 1400);
 
     return () => window.clearInterval(interval);
   }, [loading]);
@@ -237,6 +246,9 @@ ${result.summary.pageType === 'company' ? 'Company Page' : 'Personal Profile'}
 LinkedIn Score
 ${formatScoreLabel(result.roastScore, result.roastLabel)}
 
+Confidence
+${formatConfidenceLabel(result.confidence)}
+
 Average Engagement
 ${
   result.summary.avgVisiblePostInteractions != null
@@ -310,6 +322,7 @@ ${siteUrl}`;
               <span className="pill">{result.summary.pageType}</span>
               <span className="pill">{result.summary.fetchQuality} public read</span>
               <span className="pill">{formatScoreLabel(result.roastScore, result.roastLabel)}</span>
+              <span className="pill">{formatConfidenceLabel(result.confidence)}</span>
               {result.summary.visibleEmployeeCount ? (
                 <span className="pill">{result.summary.visibleEmployeeCount} employees</span>
               ) : null}
@@ -319,6 +332,11 @@ ${siteUrl}`;
             </div>
             <h2>{result.summary.displayName}</h2>
             <p className="roast-verdict">{result.roastVerdict}</p>
+            {result.confidence === 'low' ? (
+              <p className="confidence-note">
+                Limited public LinkedIn data means this score is more estimate than gospel.
+              </p>
+            ) : null}
           </section>
 
           <section className="result-card full-width">
