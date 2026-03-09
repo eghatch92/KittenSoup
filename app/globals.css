@@ -500,4 +500,9 @@ th,
     transform: translateY(-2px);
   }
 }
+  .confidence-note {
+  margin-top: 10px;
+  color: #c2b6ff;
+  font-size: 0.95rem;
+}
 }
