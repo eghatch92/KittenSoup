@@ -39,6 +39,7 @@ export async function ensureSchema() {
         display_name TEXT,
         page_type TEXT,
         roast_score INT,
+        confidence TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
@@ -66,6 +67,11 @@ export async function ensureSchema() {
     await client.query(`
       ALTER TABLE analysis_events
       ADD COLUMN IF NOT EXISTS roast_score INT;
+    `);
+
+    await client.query(`
+      ALTER TABLE analysis_events
+      ADD COLUMN IF NOT EXISTS confidence TEXT;
     `);
   } finally {
     client.release();
@@ -111,6 +117,7 @@ export async function recordAnalysisAttempt(params: {
   displayName?: string | null;
   pageType?: string | null;
   roastScore?: number | null;
+  confidence?: 'high' | 'medium' | 'low' | null;
 }) {
   await ensureSchema();
   const client = await getPool().connect();
@@ -122,9 +129,10 @@ export async function recordAnalysisAttempt(params: {
         linkedin_url,
         display_name,
         page_type,
-        roast_score
+        roast_score,
+        confidence
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6)
       `,
       [
         params.ipAddress,
@@ -132,6 +140,7 @@ export async function recordAnalysisAttempt(params: {
         params.displayName ?? null,
         params.pageType ?? null,
         params.roastScore ?? null,
+        params.confidence ?? null,
       ],
     );
   } finally {
@@ -204,9 +213,11 @@ export async function getPublicStats() {
           COALESCE(NULLIF(display_name, ''), 'Mystery LinkedIn Creature') AS display_name,
           COALESCE(NULLIF(page_type, ''), 'unknown') AS page_type,
           roast_score,
+          confidence,
           created_at
         FROM analysis_events
         WHERE roast_score IS NOT NULL
+          AND confidence IN ('high', 'medium')
           AND created_at >= NOW() - INTERVAL '24 hours'
         ORDER BY roast_score DESC, created_at DESC
         LIMIT 10
