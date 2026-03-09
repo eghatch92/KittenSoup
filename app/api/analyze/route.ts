@@ -27,7 +27,7 @@ function getRequestIp(request: NextRequest) {
 }
 
 function clampScore(value: number) {
-  return Math.max(18, Math.min(96, Math.round(value)));
+  return Math.max(30, Math.min(96, Math.round(value)));
 }
 
 function calculateRoastScore(summary: {
@@ -37,31 +37,59 @@ function calculateRoastScore(summary: {
   avgVisiblePostInteractions?: number | null;
   fetchQuality: 'full' | 'partial';
 }) {
-  let score = 62;
+  let score = 50;
 
-  if (summary.fetchQuality === 'partial') score -= 12;
-  if (!summary.recentPosts.length) score -= 16;
-  else if (summary.recentPosts.length < 3) score -= 8;
-  else if (summary.recentPosts.length >= 10) score += 6;
-
+  const postCount = summary.recentPosts.length;
   const interactions = summary.avgVisiblePostInteractions ?? null;
-  if (interactions === null) score -= 8;
-  else if (interactions <= 1) score -= 16;
-  else if (interactions <= 3) score -= 10;
-  else if (interactions <= 8) score -= 4;
-  else if (interactions >= 20) score += 8;
-  else if (interactions >= 10) score += 4;
+  const employees = summary.visibleEmployeeCount ?? null;
 
-  if (summary.pageType === 'company') {
-    const employees = summary.visibleEmployeeCount ?? null;
-    if (employees !== null) {
-      if (employees <= 5) score -= 4;
-      else if (employees >= 50) score += 4;
-      else if (employees >= 200) score += 6;
-    }
+  if (postCount >= 10) score += 12;
+  else if (postCount >= 5) score += 8;
+  else if (postCount >= 3) score += 4;
+  else if (postCount >= 1) score -= 2;
+
+  if (interactions !== null) {
+    if (interactions >= 20) score += 18;
+    else if (interactions >= 10) score += 12;
+    else if (interactions >= 5) score += 6;
+    else if (interactions >= 2) score += 1;
+    else score -= 6;
   }
 
+  if (summary.pageType === 'company' && employees !== null) {
+    if (employees >= 200) score += 6;
+    else if (employees >= 50) score += 4;
+    else if (employees >= 10) score += 2;
+  }
+
+  if (summary.fetchQuality === 'partial') score -= 4;
+
   return clampScore(score);
+}
+
+function calculateConfidence(summary: {
+  recentPosts: string[];
+  avgVisiblePostInteractions?: number | null;
+  visibleEmployeeCount?: number | null;
+  fetchQuality: 'full' | 'partial';
+  pageType: 'personal' | 'company';
+}) {
+  let confidencePoints = 0;
+
+  if (summary.fetchQuality === 'full') confidencePoints += 2;
+
+  if (summary.recentPosts.length >= 3) confidencePoints += 2;
+  else if (summary.recentPosts.length >= 1) confidencePoints += 1;
+
+  if (summary.avgVisiblePostInteractions != null) confidencePoints += 2;
+
+  if (summary.pageType === 'company' && summary.visibleEmployeeCount != null) {
+    confidencePoints += 1;
+  }
+
+  if (confidencePoints >= 5) return 'high' as const;
+  if (confidencePoints >= 3) return 'medium' as const;
+  return 'low' as const;
 }
 
 function getRoastLabel(score: number) {
@@ -72,7 +100,17 @@ function getRoastLabel(score: number) {
   return 'Hairball Emergency';
 }
 
-function getVerdictLine(score: number, pageType: 'personal' | 'company') {
+function getVerdictLine(
+  score: number,
+  pageType: 'personal' | 'company',
+  confidence: 'high' | 'medium' | 'low',
+) {
+  if (confidence === 'low') {
+    return pageType === 'company'
+      ? 'The cats only got a limited peek at this company page, so this roast is more vibe check than courtroom evidence.'
+      : 'The cats only got a limited peek at this profile, so this roast is more spicy estimate than final verdict.';
+  }
+
   if (score >= 85) {
     return pageType === 'company'
       ? 'Your company page is annoyingly competent. The cats are suspicious.'
@@ -87,7 +125,7 @@ function getVerdictLine(score: number, pageType: 'personal' | 'company') {
 
   if (score >= 55) {
     return pageType === 'company'
-      ? 'Your company page is functional, but still giving “forgotten litter box in Q4.”'
+      ? 'Your company page is functional, but still giving forgotten litter box in Q4.'
       : 'Your profile is decent, but the cats think it could stop coasting.';
   }
 
@@ -135,8 +173,13 @@ export async function POST(request: NextRequest) {
     const analysis = await generateAnalysis(summary);
 
     const roastScore = calculateRoastScore(summary);
+    const confidence = calculateConfidence(summary);
     const roastLabel = getRoastLabel(roastScore);
-    const roastVerdict = getVerdictLine(roastScore, summary.pageType);
+    const roastVerdict = getVerdictLine(roastScore, summary.pageType, confidence);
+
+    const leaderboardEligible =
+      confidence !== 'low' &&
+      (summary.recentPosts.length >= 3 || summary.avgVisiblePostInteractions != null);
 
     if (ipAddress !== 'unknown') {
       await recordAnalysisAttempt({
@@ -144,7 +187,8 @@ export async function POST(request: NextRequest) {
         linkedinUrl: summary.url,
         displayName: summary.displayName,
         pageType: summary.pageType,
-        roastScore,
+        roastScore: leaderboardEligible ? roastScore : null,
+        confidence,
       });
     }
 
@@ -153,6 +197,8 @@ export async function POST(request: NextRequest) {
       roastScore,
       roastLabel,
       roastVerdict,
+      confidence,
+      leaderboardEligible,
     });
   } catch (error) {
     console.error(error);
